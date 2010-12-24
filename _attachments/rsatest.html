@@ -1,0 +1,91 @@
+<script src="/_utils/script/jquery.js?1.4.2"></script> 
+<script src="http://plugins.jquery.com/files/jquery.cookie.js.txt"></script>
+<script src="/_utils/script/jquery.couch.js?0.11.0"></script> 
+<script src="/_utils/script/sha1.js"></script> 
+<script src="https://github.com/couchapp/couchapp/raw/master/vendor/_attachments/jquery.couch.app.js"></script> 
+<script src="ezcrypto.js"></script>
+
+<form id='owe-form' style='display:none'>
+Owe: <input id='to-name'><br>
+Amount: <input id='owed-amount'><br>
+<a href='#' onClick='sendMoney()'>Send Money</a>
+</form>
+
+<form id='login-form' style='display:none'>
+<input name='login-name' id='login-name'><input name='password' id='password' type='password'><br>
+<a href='#' onClick='login()'>Login</a> or <a href='#' onClick='register()'>Register</a>
+</form>
+
+<script>
+  var loginName;
+  
+  if (!$.cookie('session')){
+    $('#login-form').show();
+  }
+  else {
+    $('#owe-form').show();
+  }
+  
+  function login(){
+    loginName = $("#login-name").val();
+    password = $("#password").val();
+
+    $.couch.login({
+      name:loginName, password:password, success:function(res){
+        console.log(res);
+        $('#login-form').hide();
+        $('#owe-form').show();
+      }
+    });
+  };
+  
+  function register(){
+    loginName = $("#login-name").val();
+    password = $("#password").val();
+    var keys = ezcrypto.generateKeys();
+    pubKey = keys.public;
+    privKey = keys.private;
+
+    userDoc = {_id:"org.couchdb.user:"+loginName,name:loginName,roles:[],type:"user",public:pubKey,private:privKey}
+    $.couch.signup(userDoc, password, {
+      success:function(){
+        alert("Success");
+        $('#login-form').hide();
+        $('#owe-form').show();
+      }
+    });
+  };
+  
+  
+  function sendMoney(){
+    $.couch.app(function(app){
+      to = $('#to-name').val();
+      splitUp = to.split("@");
+      username = splitUp[0];
+      host = splitUp[1];
+      amount = $('#owed-amount').val();
+      $.ajaxSetup({
+        "error":function() {   
+          alert('Could not find user');
+        }
+      });
+      $.getJSON("http://"+host+"/_users/org.couchdb.user:"+username, function(res){
+        pubKey = res.public;
+        if (!pubKey){
+          alert("No public key found for user");
+          return;
+        }
+        var encryptedAmount = ezcrypto.encrypt(amount, pubKey);
+        var encryptedTo = ezcrypto.encrypt(to, pubKey);
+        //console.log(ezcrypto.decrypt(encryptedData.message, encryptedData.key, keys.public, keys.private));
+        doc= { to:encryptedTo, amount:encryptedAmount }
+        app.db.saveDoc(doc,{
+          success:function(){
+            alert('Saved debt to ' + to + ' for ' + amount);
+          }
+        });
+      });
+    });
+  }
+
+</script>
