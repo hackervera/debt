@@ -4,11 +4,11 @@
 <script src="/_utils/script/sha1.js"></script> 
 <script src="https://github.com/couchapp/couchapp/raw/master/vendor/_attachments/jquery.couch.app.js"></script> 
 <script src="ezcrypto.js"></script>
-
+<script src="config.js"></script>
 <form id='owe-form' style='display:none'>
 Owe: <input id='to-name'><br>
 Amount: <input id='owed-amount'><br>
-<a href='#' onClick='sendMoney()'>Send Money</a>
+<a href='#' onClick='sendMoney()'>Send Money</a> or <a href='#' onClick='logout()'>Logout</a>
 </form>
 
 <form id='login-form' style='display:none'>
@@ -16,15 +16,22 @@ Amount: <input id='owed-amount'><br>
 <a href='#' onClick='login()'>Login</a> or <a href='#' onClick='register()'>Register</a>
 </form>
 
+
 <script>
   var loginName;
   
-  if (!$.cookie('session')){
-    $('#login-form').show();
-  }
-  else {
-    $('#owe-form').show();
-  }
+  $.couch.session({
+    success:function(res){ 
+      console.log(res)
+      if (res.userCtx.name){
+        $('#owe-form').show();
+      }
+      else {
+        $('#login-form').show();
+      }
+    }
+  });
+    
   
   function login(){
     loginName = $("#login-name").val();
@@ -45,8 +52,8 @@ Amount: <input id='owed-amount'><br>
     var keys = ezcrypto.generateKeys();
     pubKey = keys.public;
     privKey = keys.private;
-
-    userDoc = {_id:"org.couchdb.user:"+loginName,name:loginName,roles:[],type:"user",public:pubKey,private:privKey}
+    encryptedPrivate = ezcrypto.aes(privKey, password);
+    userDoc = {_id:"org.couchdb.user:"+loginName,name:loginName,roles:[],type:"user",public:pubKey,private:encryptedPrivate}
     $.couch.signup(userDoc, password, {
       success:function(){
         alert("Success");
@@ -77,8 +84,9 @@ Amount: <input id='owed-amount'><br>
         }
         var encryptedAmount = ezcrypto.encrypt(amount, pubKey);
         var encryptedTo = ezcrypto.encrypt(to, pubKey);
+        var encryptedFrom = ezcrypto.encrypt(loginName + "@" + CONFIG.hostname, pubKey);
         //console.log(ezcrypto.decrypt(encryptedData.message, encryptedData.key, keys.public, keys.private));
-        doc= { to:encryptedTo, amount:encryptedAmount }
+        doc= { to:encryptedTo, amount:encryptedAmount, from:encryptedFrom }
         app.db.saveDoc(doc,{
           success:function(){
             alert('Saved debt to ' + to + ' for ' + amount);
@@ -86,6 +94,15 @@ Amount: <input id='owed-amount'><br>
         });
       });
     });
+  }
+  
+  function logout(){
+    $.couch.logout({
+      success:function(){
+        window.location.reload();
+      }
+    });
+    
   }
 
 </script>

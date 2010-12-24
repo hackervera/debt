@@ -14,6 +14,20 @@
     return {'key': encryptedKey, 'message': encryptedMessage};
   }
   
+  ezcrypto.aes = function(message, key){
+    var aes = new pidCrypt.AES.CBC();
+    var encryptedMessage = aes.encryptText(message, key, {nBits: 128});
+    return encryptedMessage;
+  }
+  
+  ezcrypto.unaes = function(message, key){
+    var aes = new pidCrypt.AES.CBC();
+    //decrypt the crypted text and returns the plaintext
+    //parameters; crypted text(base64 String), password(String) and options
+    var plain = aes.decryptText(message, key, {nBits: 128});
+    return plain;
+  }
+  
   ezcrypto.decrypt = function(encryptedMessage, encryptedKey, publicKey, privateKey) {
     var decryptedKey = RSADecrypt(encryptedKey, publicKey, privateKey);
     var decryptedMessage = byteArrayToString(rijndaelDecrypt(hexToByteArray(encryptedMessage), hexToByteArray(decryptedKey), 'ECB'));
@@ -35,12 +49,16 @@
     "vendor/pidcrypt_util.js",
     "vendor/asn1.js",
     "vendor/jsbn.js",
+    "vendor/md5.js",
+    "vendor/aes_core.js",
+    "vendor/aes_cbc.js",
     "vendor/rng.js",
     "vendor/prng4.js",
     "vendor/rsa.js",
     "vendor/genkey.js",
-    "vendor/rijndael.js",
-    "vendor/custom.js"
+    "vendor/rijndael.js",,
+    "vendor/custom.js",
+    "vendor/tohex.js"
   ]);
   
 })();
