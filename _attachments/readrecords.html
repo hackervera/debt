@@ -1,0 +1,97 @@
+<script src="/_utils/script/jquery.js?1.4.2"></script> 
+<script src="http://plugins.jquery.com/files/jquery.cookie.js.txt"></script>
+<script src="/_utils/script/jquery.couch.js?0.11.0"></script> 
+<script src="jquery.couch.app.js"></script> 
+<script src="config.js"></script>
+<script src="ezcrypto.js"></script>
+<script src="cookie.js"></script>
+<div id='owe'></div>
+<div id='owed'></div>
+<script>
+
+$.couch.session({
+  success:function(res){
+    var name = res.userCtx.name;
+    console.log(name);
+    $.couch.db('_users').openDoc('org.couchdb.user:' + name,{
+      success:function(res){
+        var public = res.public;
+        var private = res.private;
+        console.log(private);
+        if (!private){
+          alert("No private key set");
+          return;
+        }
+        if(!$.cookie('password')){
+          var pass = prompt("enter password to decrypt entries");
+          $.cookie('password', pass);
+        }
+        else {
+          var pass = $.cookie('password');
+        }
+        $.couch.app(function(app){
+          app.db.allDocs({
+            success:function(res){
+              var total_to = {};
+              var total_from = {};
+              var finish = res.rows.length -1;
+              for (i=0;i<res.rows.length;i++){
+                
+                var record = res.rows[i];
+                console.log(record);
+                if (record.id[0] != "_"){
+                  app.db.openDoc(record.id, {
+                    success:function(res){
+                      var amount = res.amount;
+                      var from = res.from;
+                      var to = res.to;
+                      var privKey = ezcrypto.unaes(private, pass);
+                      //console.log(privKey);
+                      if (privKey.length < 1){ return; }
+                      try {
+                        var amount = ezcrypto.decrypt(amount.message, amount.key, public, privKey);
+                        var to = ezcrypto.decrypt(to.message, to.key, public, privKey);
+                        var from = ezcrypto.decrypt(from.message, from.key, public, privKey);
+                        console.log("amount: "+ amount +", to: " + to + ", from: " + from);
+                        
+                        
+                        if (to != name+'@'+CONFIG.hostname){
+                          total_to[to] = total_to[to] || 0;
+                          total_to[to] += parseInt(amount);
+                        }
+                        if (from != name+'@'+CONFIG.hostname){
+                          total_from[from] = total_from[from] || 0;
+                          total_from[from] += parseInt(amount);
+                        }
+                      }
+                      catch(e) {
+                        console.log(e + ': skipping record');
+                      }
+                      
+                    }
+                  });
+                }
+                
+              };
+              setTimeout(function(){ 
+                console.log(total_to);
+                for (record in total_to){
+                  console.log('You owe ' + record + ' ' + total_to[record]);
+                  $('#owe').append('You owe ' + record + ' ' + total_to[record]+'<br>');
+                }
+              }, 1000);
+              setTimeout(function(){ 
+                console.log(total_from);
+                for (record in total_from){
+                  console.log(record + ' owes you ' + total_from[record]);
+                  $('#owed').append(record + ' owes you ' + total_from[record]+'<br>');
+                }
+              }, 1000);
+            }
+          });
+        });
+      }
+    });
+  }
+});
+</script>

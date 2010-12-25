@@ -1,8 +1,7 @@
 <script src="/_utils/script/jquery.js?1.4.2"></script> 
-<script src="http://plugins.jquery.com/files/jquery.cookie.js.txt"></script>
 <script src="/_utils/script/jquery.couch.js?0.11.0"></script> 
 <script src="/_utils/script/sha1.js"></script> 
-<script src="https://github.com/couchapp/couchapp/raw/master/vendor/_attachments/jquery.couch.app.js"></script> 
+<script src="jquery.couch.app.js"></script> 
 <script src="ezcrypto.js"></script>
 <script src="config.js"></script>
 <form id='owe-form' style='display:none'>
@@ -65,6 +64,28 @@ Amount: <input id='owed-amount'><br>
   
   
   function sendMoney(){
+    $.couch.session({
+      success:function(res){ 
+        console.log(res)
+        var username = res.userCtx.name;
+        $.couch.db('_users').openDoc('org.couchdb.user:' + username,{
+          success:function(res){
+            var public = res.public; // encrypt document for this user
+            var encryptedAmount = ezcrypto.encrypt(amount, public);
+            var encryptedTo = ezcrypto.encrypt(to, public);
+            var encryptedFrom = ezcrypto.encrypt(username + "@" + CONFIG.hostname, public);
+            doc= { to:encryptedTo, amount:encryptedAmount, from:encryptedFrom }
+            $.couch.app(function(app){
+              app.db.saveDoc(doc,{
+                success:function(){
+                  console.log('Saved debt to ' + to + ' for ' + amount);
+                }
+              });
+            });
+          }
+        });
+      }
+    });
     $.couch.app(function(app){
       to = $('#to-name').val();
       splitUp = to.split("@");
@@ -77,19 +98,24 @@ Amount: <input id='owed-amount'><br>
         }
       });
       $.getJSON("http://"+host+"/_users/org.couchdb.user:"+username, function(res){
-        pubKey = res.public;
+        pubKey = res.public; //encrypt document for other user
         if (!pubKey){
           alert("No public key found for user");
           return;
         }
-        var encryptedAmount = ezcrypto.encrypt(amount, pubKey);
-        var encryptedTo = ezcrypto.encrypt(to, pubKey);
-        var encryptedFrom = ezcrypto.encrypt(loginName + "@" + CONFIG.hostname, pubKey);
-        //console.log(ezcrypto.decrypt(encryptedData.message, encryptedData.key, keys.public, keys.private));
-        doc= { to:encryptedTo, amount:encryptedAmount, from:encryptedFrom }
-        app.db.saveDoc(doc,{
-          success:function(){
-            alert('Saved debt to ' + to + ' for ' + amount);
+        $.couch.session({
+          success:function(res){ 
+            var username = res.userCtx.name;
+            var encryptedAmount = ezcrypto.encrypt(amount, pubKey);
+            var encryptedTo = ezcrypto.encrypt(to, pubKey);
+            var encryptedFrom = ezcrypto.encrypt(loginName + "@" + CONFIG.hostname, pubKey);
+            //console.log(ezcrypto.decrypt(encryptedData.message, encryptedData.key, keys.public, keys.private));
+            doc= { to:encryptedTo, amount:encryptedAmount, from:encryptedFrom }
+            app.db.saveDoc(doc,{
+              success:function(){
+                console.log('Saved debt to ' + to + ' for ' + amount);
+              }
+            });
           }
         });
       });

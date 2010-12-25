@@ -56,7 +56,7 @@
     "vendor/prng4.js",
     "vendor/rsa.js",
     "vendor/genkey.js",
-    "vendor/rijndael.js",,
+    "vendor/rijndael.js",
     "vendor/custom.js",
     "vendor/tohex.js"
   ]);
